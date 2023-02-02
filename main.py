@@ -30,6 +30,7 @@ for filename in os.listdir(input_dir):
 
             if (is_first_photo):
                 FIRST_PHOTO_DATE = photo_datetime(filename)
+                is_first_photo = False
 
             day = photo_day_number(filename, FIRST_PHOTO_DATE)
             date = photo_date_formatted(filename)
