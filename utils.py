@@ -1,29 +1,30 @@
 from datetime import datetime
 import re
 import cv2
-import math
+from math import atan2, degrees, dist
 import numpy as np
+
 
 def photo_datetime(photo_date: str):
     """
     Args:
-        - Telegram's datetime of the photo.
+        photo_date: Telegram's datetime of the photo.
 
     Returns the datetime of the photo.
     """
 
-    regex_date = re.compile(
-        r"photo_\d+@(\d{2}-\d{2}-\d{4})_\d{2}-\d{2}-\d{2}.jpg")
+    regex_date = re.compile(r"photo_\d+@(\d{2}-\d{2}-\d{4})_\d{2}-\d{2}-\d{2}.jpg")
     date_str = regex_date.search(photo_date).group(1)
 
     day, month, year = [int(i) for i in date_str.split("-")]
 
     return datetime(year, month, day)
 
+
 def photo_day_number(photo_date: str, FIRST_PHOTO_DATE: datetime):
     """
     Args:
-        - Telegram's datetime of the photo.
+        photo_date: Telegram's datetime of the photo.
 
     Returns the number of days since the first
     photo.
@@ -35,30 +36,23 @@ def photo_day_number(photo_date: str, FIRST_PHOTO_DATE: datetime):
 
 
 def photo_date_formatted(photo_date: str):
-    regex_date = re.compile(
-        r"photo_\d+@(\d{2}-\d{2}-\d{4})_\d{2}-\d{2}-\d{2}.jpg")
-    date_str = regex_date.search(photo_date).group(1)
+    """
+    Args:
+        photo_date: Telegram's datetime of the photo.
 
-    day, month, year = [int(i) for i in date_str.split("-")]
+    Returns the formatted string of the date.
+    e.g.: `"17/03/2021"`
+    """
+    date = photo_datetime(photo_date)
 
-    return f"{day:02}/{month:02}/{year:04}"
-
-
-def point_dist(a, b):
-    """Returns the distance between two points"""
-
-    xa, ya = a
-    xb, yb = b
-    diffx = abs(xa-xb)
-    diffy = abs(ya-yb)
-    return math.sqrt((diffx**2) + (diffy**2))
+    return f"{date.day:02}/{date.month:02}/{date.year:04}"
 
 
-def lm2coord(lm, resolution):
+def lm2coord(landmark, resolution):
     """Converts a face landmark to coordinates"""
 
-    w, h = resolution
-    return (int(lm.x*w), int(lm.y*h))
+    width, height = resolution
+    return (int(landmark.x * width), int(landmark.y * height))
 
 
 def to_target(img, p, t, resolution):
@@ -66,53 +60,62 @@ def to_target(img, p, t, resolution):
 
     xc, yc = t
     xp, yp = p
-    offx = abs(xp - xc) if (xp <= xc) else -abs(xp - xc)
-    offy = abs(yp - yc) if (yp <= yc) else -abs(yp - yc)
+    offx = xc - xp
+    offy = yc - yp
 
     M = np.float32([[1, 0, offx], [0, 1, offy]])
-    out = cv2.warpAffine(img, M, resolution)
-    return out
+
+    return cv2.warpAffine(img, M, resolution)
 
 
 def shrink(img, pivot, scale, resolution):
     """Shrinks an image based on the 'scale' value (between 0 and 1)"""
 
     M = cv2.getRotationMatrix2D(pivot, 0, scale)
-    out = cv2.warpAffine(img, M, resolution)
-    return out
+
+    return cv2.warpAffine(img, M, resolution)
 
 
 def rotate(img, pivot, ple, pre, resolution):
-    """Calculates the degrees needed to rotate the image so that the eyes are in a straight line. Rotates around the pivot"""
+    """
+    Calculates the degrees needed to rotate the image so that
+    the eyes are in a straight line. Rotates around the pivot
+    """
 
-    deg = -90 - math.atan2(ple[0] - pre[0], ple[1] - pre[1]) * 180 / math.pi
+    deg = -degrees(atan2(ple[0] - pre[0], ple[1] - pre[1])) - 90
 
     M = cv2.getRotationMatrix2D(pivot, deg, 1)
-    out = cv2.warpAffine(img, M, resolution)
-    return out
+
+    return cv2.warpAffine(img, M, resolution)
 
 
 def at_center(p, resolution):
-    """Checks if a point is at the center of the image (inside the second third of the height and width)"""
+    """
+    Checks if a point is at the center of the image
+    (inside the second third of the height and width)
+    """
 
     px, py = p
-    rw, rh = resolution
-    return (rw/3 <= px <= rw*2/3) and (rh/3 <= py <= rh*2/3)
+    width, height = resolution
+    return (width / 3 <= px <= width * 2 / 3) and (height / 3 <= py <= height * 2 / 3)
 
 
 def c_closest(faces, center, resolution):
-    """Returns the face that is closest to the center among a given set"""
+    """
+    Returns the face that is closest to the center
+    among a given set
+    """
 
     mindist = float("inf")
     minface = False
 
-    if (faces):
+    if faces:
         for face in faces:
             nose = lm2coord(face.landmark[4], resolution)
             if at_center(nose, resolution):
-                dist = point_dist(center, nose)
-                if (dist < mindist):
-                    mindist = dist
+                distance = dist(center, nose)
+                if distance < mindist:
+                    mindist = distance
                     minface = face
 
     return minface
@@ -126,8 +129,3 @@ def drawp(i, p):
     cv2.imshow("drawp", out)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
-
-if __name__ == "__main__":
-    example = "photo_1@20-03-2021_00-18-52"
-    print(photo_day_number(example))  # 4
