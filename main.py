@@ -19,11 +19,14 @@ font = ImageFont.truetype("./fonts/Roboto.ttf", 30)
 if not os.path.exists(labled_dir):
     os.makedirs(labled_dir)
 
+filenames = os.listdir(input_dir)
+filenames.sort(key=photo_datetime)
+
 FIRST_PHOTO_DATE = None
 is_first_photo = True
 
 # Apply label to images and save
-for filename in os.listdir(input_dir):
+for filename in filenames:
     if filename.endswith(".jpg"):
         with Image.open(os.path.join(input_dir, filename)) as image:
             draw = ImageDraw.Draw(image)
